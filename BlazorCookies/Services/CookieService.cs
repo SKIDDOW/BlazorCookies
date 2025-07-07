@@ -17,19 +17,29 @@ public class CookieService
     {
         try
         {
-            var requestData = new { Key = key, Value = value };
-            var response = await _jsRuntime.InvokeAsync<string>("fetch", "/api/cookie/save", new
-            {
-                method = "POST",
-                headers = new Dictionary<string, string>
-                {
-                    ["Content-Type"] = "application/json"
-                },
-                body = JsonSerializer.Serialize(requestData),
-                credentials = "include"
-            });
+            // Inject JS function once (safe even if repeated)
+            await _jsRuntime.InvokeVoidAsync("eval", @"
+                window.setCookieViaFetch = async function (url, data) {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify(data)
+                    });
+                    return await response.text();
+                };
+            ");
 
-            Console.WriteLine("Cookie set successfully");
+            var requestData = new { Key = key, Value = value };
+
+            var response = await _jsRuntime.InvokeAsync<string>(
+                "setCookieViaFetch",
+                "/api/cookie/save",
+                requestData
+            );
+
         }
         catch (Exception ex)
         {
@@ -43,21 +53,21 @@ public class CookieService
         {
             // Inject JS if not already done
             await _jsRuntime.InvokeVoidAsync("eval", @"
-            window.blazorFetch = async function(url, method, data) {
-                const options = {
-                    method: method,
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include'
+                window.blazorFetch = async function(url, method, data) {
+                    const options = {
+                        method: method,
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include'
+                    };
+                    if (method === 'POST') {
+                        options.body = JSON.stringify(data);
+                    }
+                    const res = await fetch(url, options);
+                    return await res.text();
                 };
-                if (method === 'POST') {
-                    options.body = JSON.stringify(data);
-                }
-                const res = await fetch(url, options);
-                return await res.text();
-            };
-        ");
+            ");
 
-            var requestData = new { Key = key }; 
+            var requestData = new { Key = key };
 
             var result = await _jsRuntime.InvokeAsync<string>(
                 "blazorFetch",

@@ -26,7 +26,7 @@ public class CookieController : ControllerBase
         catch (Exception ex)
         {
             return BadRequest($"Error saving cookie: {ex.Message}");
-        }        
+        }
     }
 
 
@@ -42,7 +42,7 @@ public class CookieController : ControllerBase
         {
             return BadRequest($"Error reading cookie: {ex.Message}");
         }
-        
+
     }
 }
 
